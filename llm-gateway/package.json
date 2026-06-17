@@ -1,0 +1,30 @@
+{
+  "name": "llm-gateway",
+  "version": "0.1.0",
+  "description": "LLM middleware gateway — Phase 1 skeleton: Claude pass-through with cost & latency metadata.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file=.env server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file=.env dist/server.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:routing": "tsx routing.test.ts",
+    "test:optimizer": "tsx optimizer.test.ts",
+    "test:usage": "tsx usage.test.ts",
+    "test:hardening": "tsx hardening.test.ts",
+    "test": "tsx routing.test.ts && tsx optimizer.test.ts && tsx usage.test.ts && tsx hardening.test.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "openai": "^4.73.0",
+    "fastify": "^5.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "@types/node": "^22.9.0"
+  }
+}
