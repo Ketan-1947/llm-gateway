@@ -46,6 +46,17 @@ export const config = {
   anthropicApiKey: env("ANTHROPIC_API_KEY"),
   // Optional: only needed once routing sends traffic to OpenAI models.
   openaiApiKey: env("OPENAI_API_KEY", ""),
+  // Optional: powers the Phase-2.5 LLM classifier tie-break (Groq-hosted
+  // llama-3.1-8b-instant). Empty => tie-break disabled, heuristics only.
+  groqApiKey: env("GROQ_API_KEY", ""),
+  // LLM tie-break controls. The heuristic classifier runs first on every
+  // request; the LLM is consulted ONLY when heuristic confidence is below
+  // the threshold (the same cases the router would otherwise blindly round
+  // up). This keeps cost + latency near-zero on the common path.
+  llmTiebreakEnabled: env("LLM_TIEBREAK_ENABLED", "true") === "true",
+  llmTiebreakThreshold: Number(env("LLM_TIEBREAK_THRESHOLD", "0.6")),
+  llmClassifierModel: env("LLM_CLASSIFIER_MODEL", "llama-3.1-8b-instant"),
+  llmClassifierTimeoutMs: Number(env("LLM_CLASSIFIER_TIMEOUT_MS", "700")),
   // Plaintext keys (dev) — empty AND no hashes => auth disabled.
   gatewayApiKeys: env("GATEWAY_API_KEYS", "")
     .split(",")
@@ -92,6 +103,8 @@ export const PRICE_TABLE: Record<string, ModelPrice> = {
   "gpt-4o-mini": { provider: "openai", inputPer1k: 0.00015, outputPer1k: 0.0006 },
   "o3-mini": { provider: "openai", inputPer1k: 0.0011, outputPer1k: 0.0044 },
   "o1": { provider: "openai", inputPer1k: 0.015, outputPer1k: 0.06 },
+  // Groq — routing classifier only. $0.05/1M in, $0.08/1M out (June 2026).
+  "llama-3.1-8b-instant": { provider: "groq", inputPer1k: 0.00005, outputPer1k: 0.00008 },
 };
 
 /** Compute USD cost for a completed call. Falls back to 0 with a warning

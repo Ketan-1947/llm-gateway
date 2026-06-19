@@ -1,46 +1,24 @@
-// Route definitions (full pipeline as of Phase 5):
+// Native route definitions (full pipeline as of Phase 5):
 //   POST /v1/chat          — rate-limit -> guard -> optimise -> classify ->
 //                            route -> budget -> dispatch -> log
 //   POST /v1/route         — DRY RUN: optimise + classify + route, no LLM call
 //   POST /v1/optimise-only — optimise a prompt, no LLM call, no routing
 //   GET  /v1/usage         — aggregated token/cost stats (+ baseline savings)
 //   GET  /v1/health        — liveness + provider config flags
-//   GET  /v1/models        — model catalog with prices
+//
+// The OpenAI-compatible facade (/v1/chat/completions, /v1/models) lives in
+// openaiCompat.ts and reuses the same pipeline.
 
-import { randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { apiKeyAuth, requestKeyId } from "./auth.js";
-import { estimateRequestCost, type BudgetTracker } from "./budget.js";
-import { classify, estimateTokens } from "./classifier.js";
-import { config, PRICE_TABLE } from "./config.js";
-import type { ProviderManager } from "./dispatch.js";
-import { preflightGuard } from "./guard.js";
+import { config } from "./config.js";
+import { hybridClassify } from "./llmClassifier.js";
 import { optimize } from "./optimizer.js";
-import type { RateLimiter } from "./rateLimit.js";
+import { estCostSaved, runChatPipeline, type Services } from "./pipeline.js";
 import { route } from "./router.js";
-import {
-  GatewayError,
-  type ChatRequestBody,
-  type ChatResponseBody,
-  type LLMRequest,
-  type Message,
-} from "./types.js";
-import type { UsageStore } from "./usageStore.js";
+import type { ChatRequestBody } from "./types.js";
 
-/** Everything the routes need, bundled so the signature stays stable. */
-export interface Services {
-  manager: ProviderManager;
-  usage: UsageStore;
-  limiter: RateLimiter;
-  budget: BudgetTracker;
-}
-
-/** Price tokensSaved at a model's input rate (USD). */
-function estCostSaved(model: string, tokensSaved: number): number {
-  const price = PRICE_TABLE[model];
-  if (!price || tokensSaved <= 0) return 0;
-  return Math.round((tokensSaved / 1000) * price.inputPer1k * 1e6) / 1e6;
-}
+export type { Services } from "./pipeline.js";
 
 const chatBodySchema = {
   type: "object",
@@ -71,107 +49,20 @@ const chatBodySchema = {
 } as const;
 
 export function registerRoutes(app: FastifyInstance, services: Services): void {
-  const { manager, usage, limiter, budget } = services;
-  // --- POST /v1/chat ---
+  const { usage } = services;
+
+  // --- POST /v1/chat (native shape) ---
   app.post<{ Body: ChatRequestBody }>(
     "/v1/chat",
     { preHandler: apiKeyAuth, schema: { body: chatBodySchema } },
     async (req, reply) => {
       const { prompt, context, preferences } = req.body;
-      const requestId = `req_${randomUUID()}`;
-      const keyId = requestKeyId(req);
-
-      // 1) Rate limit (per key, before any work).
-      limiter.check(keyId);
-
-      // 2) Pre-flight guard on the raw prompt (PII / jailbreak / size).
-      const guard = preflightGuard(prompt, estimateTokens(prompt, context));
-      if (guard.action === "block") {
-        throw new GatewayError(400, guard.code ?? "prompt_blocked", guard.message ?? "Blocked.");
-      }
-
-      // 3) Optimize unless opted out (only ever helps or no-ops).
-      const doOptimise = preferences?.optimise !== false;
-      const opt = doOptimise ? optimize(prompt) : null;
-      const effectivePrompt = opt ? opt.optimisedPrompt : prompt;
-
-      // 4) Route on the (possibly optimized) prompt: optimise -> route.
-      const classification = classify(effectivePrompt, context);
-      const decision = route(classification, preferences);
-
-      const messages: Message[] = [
-        ...(context ?? []),
-        { role: "user", content: effectivePrompt },
-      ];
-
-      const baseReq: Omit<LLMRequest, "model"> = {
-        messages,
-        maxTokens: config.defaultMaxTokens,
-        temperature: config.defaultTemperature,
-        ...(opt?.systemPromptSuggestion
-          ? { systemPrompt: opt.systemPromptSuggestion }
-          : {}),
-      };
-
-      // 5) Budget check BEFORE spending (worst-case = full output budget).
-      const estimate = estimateRequestCost(
-        decision.model,
-        estimateTokens(effectivePrompt, context),
-        config.defaultMaxTokens,
-      );
-      budget.enforce(keyId, estimate, preferences?.maxCost);
-
-      // 6) Dispatch.
-      const { response: llmRes, fallbackUsed } = await manager.dispatch(
-        decision,
-        baseReq,
-      );
-
-      // 7) Record actual spend against the daily budget.
-      budget.addSpend(keyId, llmRes.cost);
-
-      const tokensSaved = opt?.tokensSaved ?? 0;
-
-      const body: ChatResponseBody = {
-        response: llmRes.content,
-        metadata: {
-          originalPrompt: prompt,
-          optimisedPrompt: effectivePrompt,
-          rulesApplied: opt?.rulesApplied ?? [],
-          tokensSaved,
-          estCostSaved: estCostSaved(decision.model, tokensSaved),
-          modelUsed: llmRes.model,
-          provider: llmRes.provider,
-          taskType: classification.taskType,
-          classificationConfidence: classification.confidence,
-          routingReason: decision.reason,
-          fallbackUsed,
-          guardFlags: guard.flags,
-          tokensUsed: llmRes.tokensUsed,
-          cost: llmRes.cost,
-          latencyMs: llmRes.latencyMs,
-          requestId,
-        },
-      };
-
-      // Phase 4: log the request (cost meter + usage). Never throw from here.
-      usage.append({
-        requestId,
-        timestamp: new Date().toISOString(),
-        apiKeyId: keyId,
-        taskType: classification.taskType,
-        provider: llmRes.provider,
-        model: llmRes.model,
-        tokensIn: llmRes.tokensUsed.input,
-        tokensOut: llmRes.tokensUsed.output,
-        cost: llmRes.cost,
-        tokensSaved,
-        estCostSaved: body.metadata.estCostSaved,
-        latencyMs: llmRes.latencyMs,
-        fallbackUsed,
-        optimised: doOptimise,
+      const { body, requestId } = await runChatPipeline(services, {
+        prompt,
+        context,
+        preferences,
+        keyId: requestKeyId(req),
       });
-
       reply.header("x-request-id", requestId);
       return body;
     },
@@ -197,7 +88,7 @@ export function registerRoutes(app: FastifyInstance, services: Services): void {
       const doOptimise = preferences?.optimise !== false;
       const opt = doOptimise ? optimize(prompt) : null;
       const effectivePrompt = opt ? opt.optimisedPrompt : prompt;
-      const classification = classify(effectivePrompt, context);
+      const classification = await hybridClassify(effectivePrompt, context);
       const decision = route(classification, preferences);
       return {
         optimisedPrompt: effectivePrompt,
@@ -234,21 +125,17 @@ export function registerRoutes(app: FastifyInstance, services: Services): void {
       providers: {
         anthropic: Boolean(config.anthropicApiKey),
         openai: Boolean(config.openaiApiKey),
+        groq: Boolean(config.groqApiKey),
       },
+      llmTiebreak:
+        config.llmTiebreakEnabled && Boolean(config.groqApiKey)
+          ? {
+              enabled: true,
+              model: config.llmClassifierModel,
+              threshold: config.llmTiebreakThreshold,
+            }
+          : { enabled: false },
       authEnabled: config.gatewayApiKeys.length > 0,
-    };
-  });
-
-  // --- GET /v1/models ---
-  app.get("/v1/models", async () => {
-    return {
-      models: Object.entries(PRICE_TABLE).map(([id, p]) => ({
-        id,
-        provider: p.provider,
-        inputPer1k: p.inputPer1k,
-        outputPer1k: p.outputPer1k,
-      })),
-      default: config.defaultModel,
     };
   });
 }

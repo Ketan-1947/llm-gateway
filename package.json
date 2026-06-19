@@ -15,7 +15,8 @@
     "test:optimizer": "tsx optimizer.test.ts",
     "test:usage": "tsx usage.test.ts",
     "test:hardening": "tsx hardening.test.ts",
-    "test": "tsx routing.test.ts && tsx optimizer.test.ts && tsx usage.test.ts && tsx hardening.test.ts"
+    "test:hybrid": "tsx classifier.hybrid.test.ts",
+    "test": "tsx routing.test.ts && tsx optimizer.test.ts && tsx usage.test.ts && tsx hardening.test.ts && tsx classifier.hybrid.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

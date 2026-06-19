@@ -12,6 +12,7 @@ import { BudgetTracker } from "./budget.js";
 import { RateLimiter } from "./rateLimit.js";
 import { config } from "./config.js";
 import { registerRoutes } from "./routes.js";
+import { registerOpenAICompatRoutes } from "./openaiCompat.js";
 import { InMemoryUsageStore } from "./usageStore.js";
 import { GatewayError } from "./types.js";
 
@@ -59,7 +60,9 @@ async function main() {
   const usage = new InMemoryUsageStore();
   const limiter = new RateLimiter();
   const budget = new BudgetTracker();
-  registerRoutes(app, { manager, usage, limiter, budget });
+  const services = { manager, usage, limiter, budget };
+  registerRoutes(app, services);
+  registerOpenAICompatRoutes(app, services); // OpenAI-compatible facade
 
   // Web UI (public, no auth).
   app.get("/", async (_req, reply) => {

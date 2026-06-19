@@ -24,7 +24,9 @@ Client → /v1/chat → [auth] → rate-limit → guard → optimise → classif
 | File | Role |
 |------|------|
 | `server.ts` | Entry point; builds the ProviderManager; error envelope |
-| `routes.ts` | `/v1/chat`, `/v1/route`, `/v1/optimise-only`, `/v1/health`, `/v1/models` |
+| `routes.ts` | Native API: `/v1/chat`, `/v1/route`, `/v1/optimise-only`, `/v1/health`, `/v1/usage` |
+| `pipeline.ts` | Shared pipeline (simple + rich/tool paths); `prepare`/`finalize`, one-shot + streaming |
+| `openaiCompat.ts` | OpenAI-compatible facade: `/v1/chat/completions` (true SSE streaming + tools), `/v1/models` |
 | `auth.ts` | Bearer API-key check (stub) |
 | `optimizer.ts` | Rule-based prompt optimizer + intent-fingerprint guard |
 | `classifier.ts` | Heuristic task classifier → `{taskType, confidence, signals}` |
@@ -88,6 +90,69 @@ curl -X POST localhost:3000/v1/chat \
 
 `/v1/chat` metadata now includes `taskType`, `classificationConfidence`,
 `routingReason`, and `fallbackUsed`.
+
+## Use it from an editor (OpenAI-compatible facade)
+
+The gateway also speaks the **OpenAI Chat Completions protocol**, so any tool
+that accepts a custom OpenAI-compatible provider — **Continue.dev, Cline, Cursor,
+Zed, GitHub Copilot Chat (BYOK), the `openai` SDK**, etc. — can use it as a model
+provider. Point the tool at:
+
+```
+Base URL: http://localhost:3000/v1
+API key:  dev-key-123        (any GATEWAY_API_KEYS value)
+Model:    gateway-auto       (full optimise + intelligent routing)
+```
+
+> **Copilot note:** BYOK applies to Copilot **Chat / agent mode only** — inline
+> autocomplete stays on GitHub's models and cannot be redirected. Continue/Cline
+> are the lowest-friction way to try it.
+
+Endpoints:
+
+- `GET /v1/models` — model list in OpenAI shape. Advertises `gateway-auto` plus
+  every catalog model.
+- `POST /v1/chat/completions` — standard request/response, with **true token
+  streaming** (`stream: true`) and **function/tool calling** (`tools` +
+  `tool_choice`). Routing/optimisation details come back under
+  `x_gateway_metadata` (non-streaming).
+
+`model` handling: `gateway-auto` (or any unknown id) → full auto-routing; a
+concrete catalog id (e.g. `claude-sonnet-4-6`) → forced model.
+
+**Two pipeline paths**, chosen automatically:
+- **Simple** (plain chat, no tools): last user turn → optimiser → classify →
+  route. The optimiser's token savings still apply.
+- **Rich** (request carries `tools` or tool/assistant-tool-call turns): the full
+  `messages[]` are passed through **verbatim** (optimiser skipped, so tool-call
+  structure is never rewritten); classify + route still choose the model. Tool
+  defs/calls/results are translated to each provider's native format (OpenAI
+  function calling ⇄ Anthropic `tool_use`/`tool_result`).
+
+```bash
+# Non-streaming, OpenAI shape:
+curl -X POST localhost:3000/v1/chat/completions \
+  -H "Authorization: Bearer dev-key-123" -H "Content-Type: application/json" \
+  -d '{"model":"gateway-auto","messages":[{"role":"user","content":"Write a haiku about autumn."}]}'
+
+# Streaming (SSE):
+curl -N -X POST localhost:3000/v1/chat/completions \
+  -H "Authorization: Bearer dev-key-123" -H "Content-Type: application/json" \
+  -d '{"model":"gateway-auto","stream":true,"messages":[{"role":"user","content":"Hi"}]}'
+
+# Tool / function calling:
+curl -X POST localhost:3000/v1/chat/completions \
+  -H "Authorization: Bearer dev-key-123" -H "Content-Type: application/json" \
+  -d '{"model":"gateway-auto","messages":[{"role":"user","content":"Weather in Paris?"}],
+       "tools":[{"type":"function","function":{"name":"get_weather",
+         "parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}]}'
+# -> finish_reason "tool_calls", message.tool_calls[0].function = {name:"get_weather", arguments:"{\"city\":\"Paris\"}"}
+```
+
+> **Streaming is true token streaming**: deltas are forwarded from the provider
+> as they arrive (`ProviderAdapter.stream()`), with usage/cost finalised when the
+> stream ends. Cross-provider fallback applies only *before the first token* — once
+> bytes are on the wire, the chosen stream is committed.
 
 ## Routing table
 
