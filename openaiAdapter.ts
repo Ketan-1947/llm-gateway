@@ -5,7 +5,7 @@
 // Supports one-shot call(), streaming stream(), and OpenAI-native tool use.
 
 import OpenAI from "openai";
-import { computeCost, config } from "../config.js";
+import { computeCost, config } from "./config.js";
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 type ChatParams = OpenAI.Chat.Completions.ChatCompletionCreateParamsNonStreaming;
@@ -18,7 +18,7 @@ import {
   type ProviderAdapter,
   type ProviderName,
   type ToolCall,
-} from "../shared/types.js";
+} from "./types.js";
 
 function isReasoningModel(model: string): boolean {
   return model.startsWith("o1") || model.startsWith("o3");

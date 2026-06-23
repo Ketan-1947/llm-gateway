@@ -2,12 +2,12 @@
 // Prices are the SINGLE source of truth for cost — adapters never trust
 // vendor-reported costs, they compute from here.
 
-// import type { ProviderName } from "./shared/types.js";
+// import type { ProviderName } from "./types.js";
 
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ProviderName } from "./shared/types.js";
+import type { ProviderName } from "./types.js";
 
 // Load .env regardless of how the app is launched.
 function loadDotenv(): void {
@@ -30,6 +30,9 @@ function loadDotenv(): void {
   }
 }
 loadDotenv();
+
+// Model used only for complexity classification.
+export const CLASSIFIER_MODEL = "gpt-4.1-mini";
 
 function env(name: string, fallback?: string): string {
   const v = process.env[name];

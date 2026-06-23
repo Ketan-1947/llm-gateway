@@ -7,7 +7,7 @@
 // Run with:  npm run test:optimizer
 
 import assert from "node:assert";
-import { optimize } from "../src/routing/optimizer.js";
+import { optimize } from "./optimizer.js";
 
 let pass = 0;
 let fail = 0;

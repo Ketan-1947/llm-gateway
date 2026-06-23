@@ -11,14 +11,14 @@
 //                tool-call structure), but classify+route still apply.
 
 import { randomUUID } from "node:crypto";
-import { estimateRequestCost, type BudgetTracker } from "../services/budget.js";
-import { classify, estimateTokens } from "../routing/classifier.js";
-import { config, PRICE_TABLE } from "../config.js";
-import type { ProviderManager } from "../providers/dispatch.js";
-import { preflightGuard } from "../routing/guard.js";
-import { optimize } from "../routing/optimizer.js";
-import type { RateLimiter } from "../services/rateLimit.js";
-import { route } from "../routing/router.js";
+import { estimateRequestCost, type BudgetTracker } from "./budget.js";
+import { classify, estimateTokens } from "./classifier.js";
+import { config, PRICE_TABLE } from "./config.js";
+import type { ProviderManager } from "./dispatch.js";
+import { preflightGuard } from "./guard.js";
+import { optimize } from "./optimizer.js";
+import type { RateLimiter } from "./rateLimit.js";
+import { route } from "./router.js";
 import {
   type ComplexityResult,
   GatewayError,
@@ -30,8 +30,8 @@ import {
   type RoutingDecision,
   type ToolChoice,
   type ToolDef,
-} from "../shared/types.js";
-import type { UsageStore } from "../services/usageStore.js";
+} from "./types.js";
+import type { UsageStore } from "./usageStore.js";
 
 /** Everything the pipeline/routes need, bundled so signatures stay stable. */
 export interface Services {

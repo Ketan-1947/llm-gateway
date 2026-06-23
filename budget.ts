@@ -4,8 +4,8 @@
 // Estimates are computed BEFORE the call (worst case = full maxTokens output)
 // so we can refuse expensive requests without paying for them first.
 
-import { computeCost, config } from "../config.js";
-import { GatewayError } from "../shared/types.js";
+import { computeCost, config } from "./config.js";
+import { GatewayError } from "./types.js";
 
 /** Worst-case cost estimate: assumes the model emits the full output budget. */
 export function estimateRequestCost(

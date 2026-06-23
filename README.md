@@ -22,42 +22,35 @@ Client → /v1/chat → [auth] → rate-limit → guard → optimise → classif
 ## Project Structure
 
 ```text
-src/
-  server.ts                 # Entry point; builds Fastify + services + routes
-  config.ts                 # Env, model price table, cost calculator
-  analyser/                 # Imported prompt complexity analyser
-  pipeline/                 # Shared request pipeline
-  providers/                # Provider adapters + ProviderManager dispatch
-  routes/                   # Native gateway routes + OpenAI-compatible facade
-  routing/                  # Classifier, optimizer, guard, model router
-  services/                 # Auth, budget, rate-limit, usage store
-  shared/                   # Cross-module types and GatewayError
-public/
-  index.html                # Web UI served at /
-test/                       # No-network regression suites
+.env.example                # Safe environment template
+package.json                # Scripts + dependencies
+tsconfig.json               # TypeScript config
+server.ts                   # Entry point; builds Fastify + services + routes
+index.html                  # Web UI served at /
+*.test.ts                   # No-network regression suites
+*.ts                        # Gateway source modules, all in the project root
 ```
 
 Key files:
 
 | File | Role |
 |------|------|
-| `src/server.ts` | Entry point; builds the ProviderManager; error envelope |
-| `src/routes/routes.ts` | Native API: `/v1/chat`, `/v1/route`, `/v1/optimise-only`, `/v1/health`, `/v1/usage` |
-| `src/routes/openaiCompat.ts` | OpenAI-compatible facade: `/v1/chat/completions` (true SSE streaming + tools), `/v1/models` |
-| `src/pipeline/pipeline.ts` | Shared pipeline (simple + rich/tool paths); `prepare`/`finalize`, one-shot + streaming |
-| `src/providers/dispatch.ts` | `ProviderManager` — executes a decision with fallback |
-| `src/providers/claudeAdapter.ts` | `ProviderAdapter` for Anthropic |
-| `src/providers/openaiAdapter.ts` | `ProviderAdapter` for OpenAI (handles o1/o3 quirks) |
-| `src/routing/classifier.ts` | Complexity classifier adapter → `{route, scores, reason, approxTokens}` |
-| `src/routing/router.ts` | Routing table + confidence round-up + fallback chains |
-| `src/routing/optimizer.ts` | Rule-based prompt optimizer + intent-fingerprint guard |
-| `src/routing/guard.ts` | Pre-flight PII / jailbreak / size guard |
-| `src/services/auth.ts` | Bearer API-key check |
-| `src/services/budget.ts` | Per-request + daily budget caps, cost estimate |
-| `src/services/rateLimit.ts` | Per-key fixed-window rate limiter |
-| `src/services/usageStore.ts` | `UsageStore` seam + in-memory/JSONL impl + aggregation |
-| `src/analyser/analyser.ts` | Complexity analyser public `analysePrompt()` wrapper |
-| `src/shared/types.ts` | Shared types incl. the `ProviderAdapter` seam |
+| `server.ts` | Entry point; builds the ProviderManager; error envelope |
+| `routes.ts` | Native API: `/v1/chat`, `/v1/route`, `/v1/optimise-only`, `/v1/health`, `/v1/usage` |
+| `openaiCompat.ts` | OpenAI-compatible facade: `/v1/chat/completions` (true SSE streaming + tools), `/v1/models` |
+| `pipeline.ts` | Shared pipeline (simple + rich/tool paths); `prepare`/`finalize`, one-shot + streaming |
+| `dispatch.ts` | `ProviderManager` executes a decision with fallback |
+| `claudeAdapter.ts` | `ProviderAdapter` for Anthropic |
+| `openaiAdapter.ts` | `ProviderAdapter` for OpenAI (handles o1/o3 quirks) |
+| `classifier.ts` | Complexity classifier and token estimator |
+| `router.ts` | Routing table + confidence round-up + fallback chains |
+| `optimizer.ts` | Rule-based prompt optimizer + intent-fingerprint guard |
+| `guard.ts` | Pre-flight PII / jailbreak / size guard |
+| `auth.ts` | Bearer API-key check |
+| `budget.ts` | Per-request + daily budget caps, cost estimate |
+| `rateLimit.ts` | Per-key fixed-window rate limiter |
+| `usageStore.ts` | `UsageStore` seam + in-memory/JSONL impl + aggregation |
+| `types.ts` | Shared types incl. the `ProviderAdapter` seam |
 
 ## Setup
 
@@ -243,15 +236,14 @@ npm run test:routing     # >= 17/20 prompts route to expected model
 npm run test:optimizer   # verbose shrinks, clean no-ops, ZERO intent drift
 npm run test:usage       # aggregation, filters, baseline-savings math
 npm run test:hardening   # guard blocks/flags, rate limit, budget caps
-npm run test:hybrid      # hybrid classifier gating, no network by default
 ```
 
 All suites run with **no network calls**.
 
 ## ⚠️ Caveats
 
-- Prices in `src/config.ts` are **illustrative** — verify against live provider pricing before trusting cost numbers.
+- Prices in `config.ts` are **illustrative** — verify against live provider pricing before trusting cost numbers.
 - The complexity classifier is an **LLM call** (`gpt-4.1-mini`). It adds a small routing cost/latency before every generated answer.
 - In-memory state (usage, rate limiter, budget) is **per-instance**. For multiple replicas, back the `UsageStore` with Postgres and the limiter/budget with Redis (same interfaces).
 - The PII/jailbreak guard is a **first line of defense**, not a complete safety stack — it complements provider-side guardrails, it doesn't replace them.
-- ✅ **Verified end-to-end in-sandbox:** `tsc --noEmit` passes clean; all four suites pass (routing 21/21, optimizer, usage, hardening); the server boots and serves `/v1/health`, `/v1/models`, `/v1/route`, `/v1/optimise-only`, `/v1/usage`, and `/v1/chat` correctly returns 401 (no key), 400 (jailbreak guard), 402 (budget cap), 429 (rate limit), and reaches the provider + fails over. Live testing also caught and fixed a classifier regex bug (`scalab\b` never matched "scalable").
+- ✅ **Verified after flattening:** `npm run typecheck` passes clean; all four no-network suites pass (routing, optimizer, usage, hardening).

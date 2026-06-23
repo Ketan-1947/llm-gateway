@@ -10,16 +10,16 @@
 // openaiCompat.ts and reuses the same pipeline.
 
 import type { FastifyInstance } from "fastify";
-import { apiKeyAuth, requestKeyId } from "../services/auth.js";
-import { config } from "../config.js";
-import { CLASSIFIER_MODEL } from "../analyser/config.js";
-import { classify } from "../routing/classifier.js";
-import { optimize } from "../routing/optimizer.js";
-import { estCostSaved, runChatPipeline, type Services } from "../pipeline/pipeline.js";
-import { route } from "../routing/router.js";
-import type { ChatRequestBody } from "../shared/types.js";
+import { apiKeyAuth, requestKeyId } from "./auth.js";
+import { config } from "./config.js";
+import { CLASSIFIER_MODEL } from "./config.js";
+import { classify } from "./classifier.js";
+import { optimize } from "./optimizer.js";
+import { estCostSaved, runChatPipeline, type Services } from "./pipeline.js";
+import { route } from "./router.js";
+import type { ChatRequestBody } from "./types.js";
 
-export type { Services } from "../pipeline/pipeline.js";
+export type { Services } from "./pipeline.js";
 
 const chatBodySchema = {
   type: "object",

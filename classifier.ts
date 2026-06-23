@@ -1,18 +1,13 @@
+// ComplexityClassifier — classifies prompt capability needs.
+// The output is complexity-based: fast | balanced | strong | deep.
+
 import OpenAI from "openai";
 import { CLASSIFIER_MODEL } from "./config.js";
+import type { ComplexityResult, ComplexityScores, ComplexityRoute, Message } from "./types.js";
 
-const ROUTES = ["fast", "balanced", "strong", "deep"] as const;
+const ROUTES: ComplexityRoute[] = ["fast", "balanced", "strong", "deep"];
 
-export type Route = (typeof ROUTES)[number];
-
-type ScoreKey =
-  | "context_dependency"
-  | "reasoning_depth"
-  | "generation_scope"
-  | "precision_required"
-  | "risk";
-
-export type Scores = Record<ScoreKey, number>;
+type ScoreKey = keyof ComplexityScores;
 
 const SCORE_KEYS: ScoreKey[] = [
   "context_dependency",
@@ -22,7 +17,7 @@ const SCORE_KEYS: ScoreKey[] = [
   "risk",
 ];
 
-const DEFAULT_SCORES: Scores = {
+const DEFAULT_SCORES: ComplexityScores = {
   context_dependency: 1,
   reasoning_depth: 1,
   generation_scope: 1,
@@ -82,7 +77,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function normalizeScores(scores: unknown): Scores {
+export function normalizeScores(scores: unknown): ComplexityScores {
   const normalized = { ...DEFAULT_SCORES };
 
   if (!isRecord(scores)) {
@@ -98,7 +93,7 @@ export function normalizeScores(scores: unknown): Scores {
   return normalized;
 }
 
-export function chooseRoute(scores: Scores): Route {
+export function chooseRoute(scores: ComplexityScores): ComplexityRoute {
   const contextDependency = scores.context_dependency;
   const reasoningDepth = scores.reasoning_depth;
   const generationScope = scores.generation_scope;
@@ -147,7 +142,7 @@ export function chooseRoute(scores: Scores): Route {
   return "fast";
 }
 
-export async function llmClassify(prompt: string): Promise<[Route, Scores, string]> {
+async function analysePrompt(prompt: string): Promise<Omit<ComplexityResult, "approxTokens">> {
   const response = await client.chat.completions.create({
     model: CLASSIFIER_MODEL,
     messages: [
@@ -172,17 +167,39 @@ export async function llmClassify(prompt: string): Promise<[Route, Scores, strin
     let route = typeof parsed.route === "string" ? parsed.route : chooseRoute(scores);
     const reason = typeof parsed.reason === "string" ? parsed.reason : "classified by llm";
 
-    if (!ROUTES.includes(route as Route)) {
+    if (!ROUTES.includes(route as ComplexityRoute)) {
       route = chooseRoute(scores);
     }
 
-    return [route as Route, scores, reason];
-  } catch (error) {
-    return ["fast", { ...DEFAULT_SCORES }, "llm response parsing failed"];
+    return { route: route as ComplexityRoute, scores, reason };
+  } catch (_error) {
+    return {
+      route: "fast",
+      scores: { ...DEFAULT_SCORES },
+      reason: "llm response parsing failed",
+    };
   }
 }
 
-// Public interface.
-export async function classify(prompt: string): Promise<[Route, Scores, string]> {
-  return llmClassify(prompt);
+/** Rough token estimate (~4 chars/token). Good enough for routing buckets. */
+export function estimateTokens(prompt: string, context?: Message[]): number {
+  const contextChars = (context ?? []).reduce(
+    (count, message) => count + message.content.length,
+    0,
+  );
+  return Math.ceil((prompt.length + contextChars) / 4);
+}
+
+export async function classify(
+  prompt: string,
+  context?: Message[],
+): Promise<ComplexityResult> {
+  const analysis = await analysePrompt(prompt);
+
+  return {
+    route: analysis.route,
+    scores: analysis.scores,
+    reason: analysis.reason,
+    approxTokens: estimateTokens(prompt, context),
+  };
 }

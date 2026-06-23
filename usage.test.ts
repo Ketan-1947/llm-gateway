@@ -3,8 +3,8 @@
 // savings math.  Run with:  npm run test:usage
 
 import assert from "node:assert";
-import { computeCost } from "../src/config.js";
-import { InMemoryUsageStore, type RequestLogRecord } from "../src/services/usageStore.js";
+import { computeCost } from "./config.js";
+import { InMemoryUsageStore, type RequestLogRecord } from "./usageStore.js";
 
 let pass = 0;
 let fail = 0;

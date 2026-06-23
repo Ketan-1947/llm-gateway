@@ -1,7 +1,7 @@
 // ModelRouter — maps complexity analysis to provider/model targets.
 // The router is pure decision logic; provider execution lives in dispatch.ts.
 
-import { config, PRICE_TABLE } from "../config.js";
+import { config, PRICE_TABLE } from "./config.js";
 import {
   type ComplexityResult,
   type ComplexityRoute,
@@ -9,7 +9,7 @@ import {
   type ChatPreferences,
   type RouteTarget,
   type RoutingDecision,
-} from "../shared/types.js";
+} from "./types.js";
 
 const ANTHROPIC_PRIMARY_TABLE: Record<ComplexityRoute, RouteTarget & { note: string }> = {
   fast: {

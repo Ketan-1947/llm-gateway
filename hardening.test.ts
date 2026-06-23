@@ -3,11 +3,11 @@
 // Run with:  npm run test:hardening
 
 import assert from "node:assert";
-import { BudgetTracker, estimateRequestCost } from "../src/services/budget.js";
-import { computeCost } from "../src/config.js";
-import { preflightGuard } from "../src/routing/guard.js";
-import { RateLimiter } from "../src/services/rateLimit.js";
-import { GatewayError } from "../src/shared/types.js";
+import { BudgetTracker, estimateRequestCost } from "./budget.js";
+import { computeCost } from "./config.js";
+import { preflightGuard } from "./guard.js";
+import { RateLimiter } from "./rateLimit.js";
+import { GatewayError } from "./types.js";
 
 let pass = 0;
 let fail = 0;

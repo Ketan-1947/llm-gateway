@@ -4,7 +4,7 @@
 
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { config } from "../config.js";
+import { config } from "./config.js";
 
 function sha256Hex(s: string): string {
   return createHash("sha256").update(s).digest("hex");

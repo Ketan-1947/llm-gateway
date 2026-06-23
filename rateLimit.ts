@@ -2,8 +2,8 @@
 // For multi-instance deployments, back this with Redis (INCR + EXPIRE) behind
 // the same check() contract.
 
-import { config } from "../config.js";
-import { GatewayError } from "../shared/types.js";
+import { config } from "./config.js";
+import { GatewayError } from "./types.js";
 
 interface Window {
   count: number;

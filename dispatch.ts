@@ -9,7 +9,7 @@ import {
   type ProviderName,
   type RouteTarget,
   type RoutingDecision,
-} from "../shared/types.js";
+} from "./types.js";
 
 export interface DispatchResult {
   response: LLMResponse;

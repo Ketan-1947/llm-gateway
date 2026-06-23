@@ -2,9 +2,9 @@
 // Verifies fast/balanced/strong/deep route-to-model mapping and forceModel.
 
 import assert from "node:assert";
-import { config, PRICE_TABLE } from "../src/config.js";
-import { route } from "../src/routing/router.js";
-import type { ComplexityResult, ComplexityRoute } from "../src/shared/types.js";
+import { config, PRICE_TABLE } from "./config.js";
+import { route } from "./router.js";
+import type { ComplexityResult, ComplexityRoute } from "./types.js";
 
 interface Case {
   complexityRoute: ComplexityRoute;

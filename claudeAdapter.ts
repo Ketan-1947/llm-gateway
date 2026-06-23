@@ -4,7 +4,7 @@
 // Supports both a one-shot call() and a streaming stream().
 
 import Anthropic from "@anthropic-ai/sdk";
-import { computeCost, config } from "../config.js";
+import { computeCost, config } from "./config.js";
 import {
   GatewayError,
   type LLMRequest,
@@ -12,7 +12,7 @@ import {
   type ProviderAdapter,
   type ProviderName,
   type ToolCall,
-} from "../shared/types.js";
+} from "./types.js";
 
 // Anthropic's message/param types vary slightly across SDK versions; we keep
 // the translation loosely typed and lean on the discriminants at runtime.

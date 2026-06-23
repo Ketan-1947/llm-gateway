@@ -7,15 +7,15 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx watch --env-file=.env src/server.ts",
+    "dev": "tsx watch --env-file=.env server.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node --env-file=.env dist/src/server.js",
+    "start": "node --env-file=.env dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:routing": "tsx test/routing.test.ts",
-    "test:optimizer": "tsx test/optimizer.test.ts",
-    "test:usage": "tsx test/usage.test.ts",
-    "test:hardening": "tsx test/hardening.test.ts",
-    "test": "tsx test/routing.test.ts && tsx test/optimizer.test.ts && tsx test/usage.test.ts && tsx test/hardening.test.ts"
+    "test:routing": "tsx routing.test.ts",
+    "test:optimizer": "tsx optimizer.test.ts",
+    "test:usage": "tsx usage.test.ts",
+    "test:hardening": "tsx hardening.test.ts",
+    "test": "tsx routing.test.ts && tsx optimizer.test.ts && tsx usage.test.ts && tsx hardening.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

@@ -5,16 +5,16 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify from "fastify";
-import { ClaudeAdapter } from "./providers/claudeAdapter.js";
-import { OpenAIAdapter } from "./providers/openaiAdapter.js";
-import { ProviderManager } from "./providers/dispatch.js";
-import { BudgetTracker } from "./services/budget.js";
-import { RateLimiter } from "./services/rateLimit.js";
+import { ClaudeAdapter } from "./claudeAdapter.js";
+import { OpenAIAdapter } from "./openaiAdapter.js";
+import { ProviderManager } from "./dispatch.js";
+import { BudgetTracker } from "./budget.js";
+import { RateLimiter } from "./rateLimit.js";
 import { config } from "./config.js";
-import { registerRoutes } from "./routes/routes.js";
-import { registerOpenAICompatRoutes } from "./routes/openaiCompat.js";
-import { InMemoryUsageStore } from "./services/usageStore.js";
-import { GatewayError } from "./shared/types.js";
+import { registerRoutes } from "./routes.js";
+import { registerOpenAICompatRoutes } from "./openaiCompat.js";
+import { InMemoryUsageStore } from "./usageStore.js";
+import { GatewayError } from "./types.js";
 
 // Load the single-page UI (served at /). Looked up from cwd then module dir.
 function loadUiHtml(): string {

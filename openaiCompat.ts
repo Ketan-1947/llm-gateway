@@ -14,14 +14,14 @@
 
 import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { apiKeyAuth, requestKeyId } from "../services/auth.js";
-import { PRICE_TABLE } from "../config.js";
+import { apiKeyAuth, requestKeyId } from "./auth.js";
+import { PRICE_TABLE } from "./config.js";
 import {
   runChatPipeline,
   runChatPipelineStream,
   type PipelineInput,
   type Services,
-} from "../pipeline/pipeline.js";
+} from "./pipeline.js";
 import {
   GatewayError,
   type ChatPreferences,
@@ -31,7 +31,7 @@ import {
   type ToolCall,
   type ToolChoice,
   type ToolDef,
-} from "../shared/types.js";
+} from "./types.js";
 
 /** The virtual model that triggers full optimise + intelligent routing. */
 const AUTO_MODEL = "gateway-auto";

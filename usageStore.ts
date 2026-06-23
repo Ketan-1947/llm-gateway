@@ -7,8 +7,8 @@
 // the same seam pattern as ProviderAdapter.
 
 import { appendFileSync } from "node:fs";
-import { computeCost, config } from "../config.js";
-import type { ComplexityRoute, ProviderName } from "../shared/types.js";
+import { computeCost, config } from "./config.js";
+import type { ComplexityRoute, ProviderName } from "./types.js";
 
 export interface RequestLogRecord {
   requestId: string;

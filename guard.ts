@@ -3,7 +3,7 @@
 // This is a cheap first line of defense, NOT a replacement for provider-side
 // safety — it complements it.
 
-import { config } from "../config.js";
+import { config } from "./config.js";
 
 export interface GuardResult {
   action: "allow" | "block";
