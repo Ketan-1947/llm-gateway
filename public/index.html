@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LLM Gateway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:          #F7F3EB;  /* warm paper */
+  --s1:          #FFFDF9;  /* near-white panels/cards */
+  --s2:          #FBF7F0;  /* elevated surface */
+  --s3:          #F0E9DC;  /* hover / active */
+  --border:      #E7DFD0;  /* soft warm hairline */
+  --border-hi:   #D5CAB4;
+  --accent:      #C97E2C;  /* deep warm amber */
+  --accent-glow: rgba(201,126,44,0.14);
+  --node-end:    #1F9D6B;  /* warm-leaning emerald */
+  --node-glow:   rgba(31,157,107,0.13);
+  --text:        #2C261B;  /* warm near-black */
+  --muted:       #897B64;
+  --dim:         #B6AB95;
+  --success:     #1F9D6B;
+  --error:       #CF5236;
+
+  --font-ui:   'Geist', system-ui, -apple-system, sans-serif;
+  --font-data: 'Geist Mono', 'Fira Code', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+}
+
+::selection { background: var(--accent-glow); }
+
+::-webkit-scrollbar { width: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-hi); border-radius: 6px; border: 3px solid var(--bg); }
+
+/* ── LAYOUT ─────────────────────────────────────────────── */
+.wrap {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* ── 1. HEADER ──────────────────────────────────────────── */
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(247,243,235,0.82);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.header-inner {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.logo-mark {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+.brand-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.brand-sub {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--dim);
+  letter-spacing: 0.2px;
+}
+.header-right { display: flex; align-items: center; gap: 10px; }
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 11px;
+}
+.status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--dim);
+  flex-shrink: 0;
+  transition: background 150ms ease, box-shadow 150ms ease;
+}
+.status-pill.online .status-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--node-glow);
+  animation: dotpulse 2.4s ease-in-out infinite;
+}
+.status-pill.offline .status-dot { background: var(--error); }
+@keyframes dotpulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--node-glow); }
+  50%      { box-shadow: 0 0 0 5px rgba(31,157,107,0.05); }
+}
+.status-text {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--muted);
+}
+.status-providers {
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--dim);
+}
+
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  color: var(--muted);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+}
+.btn-ghost svg { width: 14px; height: 14px; display: block; }
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+.btn-ghost.active { border-color: var(--border-hi); color: var(--text); }
+
+/* ── 2. SETTINGS PANEL ──────────────────────────────────── */
+.settings {
+  position: sticky;
+  top: 58px;
+  z-index: 9;
+  background: var(--s1);
+  border-bottom: 1px solid var(--border);
+  display: none;
+}
+.settings.open { display: block; }
+.settings-inner {
+  padding: 16px 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.field { display: flex; flex-direction: column; gap: 7px; }
+.field-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--dim);
+}
+.field-input {
+  font-family: var(--font-data);
+  font-size: 13px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text);
+  min-width: 240px;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.field-input::placeholder { color: var(--dim); }
+.field-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.settings-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--border);
+  align-self: center;
+}
+.toggle-group { display: flex; flex-direction: column; gap: 12px; }
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+.switch {
+  width: 30px; height: 17px;
+  border-radius: 20px;
+  background: var(--s3);
+  border: 1px solid var(--border);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 180ms ease, border-color 180ms ease;
+}
+.switch-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: left 180ms ease, background 180ms ease;
+}
+.toggle-row.on .switch {
+  background: var(--accent-glow);
+  border-color: var(--accent);
+}
+.toggle-row.on .switch-thumb {
+  left: 15px;
+  background: var(--accent);
+}
+.toggle-label { font-size: 12px; color: var(--muted); }
+
+/* ── CHAT AREA ──────────────────────────────────────────── */
+.chat {
+  padding-top: 8px;
+  padding-bottom: 164px;
+  min-height: calc(100vh - 58px);
+}
+.thread { display: flex; flex-direction: column; gap: 26px; padding-top: 18px; }
+
+@keyframes msgin {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.anim-in { animation: msgin 180ms ease both; }
+
+/* ── 3. EMPTY STATE ─────────────────────────────────────── */
+.empty {
+  padding-top: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.empty-logo {
+  width: 52px; height: 52px;
+  border-radius: 14px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: logopulse 3s ease-in-out infinite;
+}
+@keyframes logopulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201,126,44,0); }
+  50%      { box-shadow: 0 0 0 8px var(--accent-glow); }
+}
+.empty-headline {
+  font-size: 22px; font-weight: 700;
+  color: var(--text);
+  margin-top: 20px;
+}
+.empty-sub {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 340px;
+  margin-top: 8px;
+  line-height: 1.55;
+}
+.howto {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin: 28px auto;
+}
+.howto-card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 100px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+.howto-icon { font-size: 16px; line-height: 1; }
+.howto-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.howto-arrow {
+  color: var(--dim);
+  font-size: 13px;
+  margin: 0 6px;
+  margin-top: -8px;
+}
+.examples-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 560px;
+}
+.chip {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--muted);
+  padding: 7px 15px;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease, background 150ms ease;
+}
+.chip:hover {
+  border-color: var(--border-hi);
+  color: var(--text);
+  background: var(--s2);
+}
+
+/* ── 4. USER MESSAGE ────────────────────────────────────── */
+.msg-user { display: flex; flex-direction: column; align-items: flex-end; }
+.msg-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--dim);
+  margin-bottom: 7px;
+}
+.user-bubble {
+  max-width: 78%;
+  background: #FAF0E0;
+  border: 1px solid #EEDCBE;
+  border-radius: 12px;
+  border-bottom-right-radius: 3px;
+  color: #4A3D28;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── BOT TURN (pipeline + response + stats) ─────────────── */
+.bot-turn { display: flex; flex-direction: column; align-items: flex-start; }
+
+/* ── 5. ROUTING PIPELINE ────────────────────────────────── */
+.pipeline {
+  position: relative;
+  overflow: hidden;
+  max-width: 88%;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px 10px 0 0;
+  padding: 14px 18px;
+}
+.pipeline.no-stats { border-radius: 10px; }
+.pipeline::after {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0;
+  left: -100%;
+  width: 100%;
+  background: linear-gradient(90deg, transparent, rgba(201,126,44,0.07), transparent);
+  pointer-events: none;
+}
+.pipeline.shimmer::after { animation: shimmer 1.4s ease forwards; }
+@keyframes shimmer { to { left: 100%; } }
+
+.nodes { display: flex; align-items: center; }
+.node {
+  position: relative;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  min-width: 76px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.node-icon { font-size: 14px; line-height: 1; }
+.node-label {
+  font-family: var(--font-data);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+}
+.node-value {
+  font-family: var(--font-data);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+.node.end {
+  border-color: var(--node-end);
+  background: var(--node-glow);
+}
+.node.end .node-label, .node.end .node-value { color: var(--node-end); }
+.node-dot {
+  position: absolute;
+  top: -3px; right: -3px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--node-end);
+  box-shadow: 0 0 0 3px var(--node-glow);
+}
+.connector { flex-shrink: 0; }
+
+/* loading pipeline */
+.node.skeleton .node-value { color: var(--dim); }
+.node.skeleton { animation: nodepulse 1s ease-in-out infinite; }
+@keyframes nodepulse { 0%,100% { opacity: 0.4; } 50% { opacity: 0.7; } }
+.routing-status {
+  font-family: var(--font-data);
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 10px;
+}
+
+/* ── 7. STATS STRIP ─────────────────────────────────────── */
+.stats {
+  max-width: 88%;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  padding: 10px 18px;
+}
+.stats-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stats-check { color: var(--success); font-size: 12px; margin-right: 2px; }
+.stat {
+  font-family: var(--font-data);
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.stat .k { color: var(--muted); }
+.stat.good { color: var(--success); }
+.stat-sep { color: var(--dim); font-family: var(--font-data); font-size: 12px; }
+.badge {
+  font-family: var(--font-data);
+  font-size: 10px;
+  border: 1px solid var(--dim);
+  color: var(--dim);
+  border-radius: 4px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+.badge.fallback { border-color: var(--node-end); color: var(--node-end); }
+.badge.guard { border-color: var(--error); color: var(--error); }
+.stats-why {
+  margin-top: 8px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.stats-why .why-k {
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--dim);
+  font-style: normal;
+}
+
+/* ── 6. BOT RESPONSE ────────────────────────────────────── */
+.bot-response {
+  max-width: 88%;
+  margin-top: 18px;
+}
+.bot-text {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.72;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bot-text p { margin-bottom: 12px; }
+.bot-text p:last-child { margin-bottom: 0; }
+.bot-text code {
+  font-family: var(--font-data);
+  font-size: 12.5px;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* ── 9. ERROR MESSAGE ───────────────────────────────────── */
+.msg-error { display: flex; flex-direction: column; align-items: flex-start; }
+.error-bubble {
+  max-width: 88%;
+  background: rgba(207,82,54,0.06);
+  border: 1px solid rgba(207,82,54,0.22);
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+.error-label {
+  font-family: var(--font-data);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--error);
+  margin-bottom: 6px;
+}
+.error-text {
+  font-family: var(--font-data);
+  font-size: 13px;
+  color: #B23E22;
+  line-height: 1.5;
+}
+
+/* ── 10. COMPOSER ───────────────────────────────────────── */
+.composer {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 8;
+  background: rgba(247,243,235,0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--border);
+}
+.composer-inner {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 14px 24px 20px;
+}
+.composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.composer-input {
+  flex: 1;
+  min-height: 48px;
+  max-height: 160px;
+  resize: none;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--text);
+  padding: 13px 16px;
+  line-height: 1.5;
+  outline: none;
+  overflow-y: auto;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+.composer-input::placeholder { color: var(--dim); }
+.composer-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.send-btn {
+  height: 48px;
+  padding: 0 24px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #FFF9F0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 150ms ease;
+}
+.send-btn:hover:not(:disabled) { opacity: 0.87; }
+.send-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.hint {
+  text-align: center;
+  margin-top: 10px;
+  font-family: var(--font-data);
+  font-size: 10px;
+  color: var(--dim);
+}
+.hint kbd {
+  font-family: var(--font-data);
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--muted);
+}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ───────────────────────────────────────────── -->
+<header class="header">
+  <div class="wrap header-inner">
+    <div class="brand">
+      <div class="logo-mark" id="header-logo"></div>
+      <div class="brand-text">
+        <span class="brand-name">LLM Gateway</span>
+        <span class="brand-sub">route · optimize · execute</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="status-pill">
+        <span class="status-dot"></span>
+        <span class="status-text" id="status-text">checking</span>
+        <span class="status-providers" id="status-providers"></span>
+      </div>
+      <button class="btn-ghost" id="settings-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ── SETTINGS PANEL ───────────────────────────────────── -->
+<section class="settings" id="settings-panel">
+  <div class="wrap settings-inner">
+    <div class="field">
+      <label class="field-label" for="apikey">Gateway API Key</label>
+      <input class="field-input" id="apikey" type="password" placeholder="sk-gw-••••••••••••" autocomplete="off" spellcheck="false" />
+    </div>
+    <div class="settings-divider"></div>
+    <div class="toggle-group">
+      <div class="toggle-row" id="toggle-optimize" role="switch" tabindex="0">
+        <span class="switch"><span class="switch-thumb"></span></span>
+        <span class="toggle-label">Optimize prompt before routing</span>
+      </div>
+      <div class="toggle-row" id="toggle-showmeta" role="switch" tabindex="0">
+        <span class="switch"><span class="switch-thumb"></span></span>
+        <span class="toggle-label">Show routing details</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CHAT ─────────────────────────────────────────────── -->
+<main class="chat">
+  <div class="wrap">
+    <div class="thread" id="thread"></div>
+  </div>
+</main>
+
+<!-- ── COMPOSER ─────────────────────────────────────────── -->
+<div class="composer">
+  <div class="composer-inner">
+    <div class="composer-row">
+      <textarea class="composer-input" id="composer-input" rows="1" placeholder="Type your prompt…"></textarea>
+      <button class="send-btn" id="send-btn" disabled>Send</button>
+    </div>
+    <div class="hint">
+      <kbd>⌘ Enter</kbd> to send &nbsp;·&nbsp; <kbd>Shift ↵</kbd> for new line
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════
+   LLM Gateway — vanilla JS
+   ════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════
+   CONFIG — production integration
+   ────────────────────────────────────────────────────────
+   DEMO_FALLBACK:
+     false → talks ONLY to your real gateway. Health + chat hit
+             window.location.origin + /v1/health and /v1/chat,
+             and real server errors are shown verbatim.
+             >>> LEAVE THIS false IN YOUR APP. <<<
+     true  → if the gateway is unreachable (network error only),
+             a local simulation answers so you can preview the UI
+             with no server. Real HTTP errors are STILL shown,
+             never masked.
+   GATEWAY_BASE:
+     '' → same origin as the page (window.location.origin).
+     Set to e.g. 'https://api.example.com' to point elsewhere.
+   ════════════════════════════════════════════════════════ */
+const DEMO_FALLBACK = false;
+const GATEWAY_BASE  = '';
+const API_BASE = GATEWAY_BASE || window.location.origin;
+
+const LS = { KEY: 'llmgw.apikey', OPT: 'llmgw.optimize', META: 'llmgw.showmeta' };
+
+const state = {
+  apiKey: localStorage.getItem(LS.KEY) || '',
+  optimize: localStorage.getItem(LS.OPT) !== 'false', // default true
+  showMeta: localStorage.getItem(LS.META) !== 'false', // default true
+  online: false,
+  busy: false,
+};
+
+/* ── logo mark SVG (one prompt → two endpoints) ─────────── */
+function logoSVG(size) {
+  const s = size;
+  // coordinates within a 24x24 viewBox
+  return `<svg width="${s*0.62}" height="${s*0.62}" viewBox="0 0 24 24" fill="none">
+    <line x1="5" y1="12" x2="18.5" y2="5.5" stroke="#C97E2C" stroke-width="1.6" stroke-opacity="0.7"/>
+    <line x1="5" y1="12" x2="18.5" y2="18.5" stroke="#C97E2C" stroke-width="1.6" stroke-opacity="0.4"/>
+    <circle cx="5" cy="12" r="3" fill="#C97E2C"/>
+    <circle cx="18.5" cy="5.5" r="2.6" fill="#1F9D6B"/>
+    <circle cx="18.5" cy="18.5" r="2.6" fill="#1F9D6B"/>
+  </svg>`;
+}
+document.getElementById('header-logo').innerHTML = logoSVG(34);
+
+/* ── DOM refs ───────────────────────────────────────────── */
+const thread        = document.getElementById('thread');
+const settingsBtn   = document.getElementById('settings-btn');
+const settingsPanel = document.getElementById('settings-panel');
+const apiKeyInput   = document.getElementById('apikey');
+const toggleOpt     = document.getElementById('toggle-optimize');
+const toggleMeta    = document.getElementById('toggle-showmeta');
+const composer      = document.getElementById('composer-input');
+const sendBtn       = document.getElementById('send-btn');
+const statusPill    = document.getElementById('status-pill');
+const statusText    = document.getElementById('status-text');
+const statusProv    = document.getElementById('status-providers');
+
+/* ── settings init ──────────────────────────────────────── */
+apiKeyInput.value = state.apiKey;
+function syncToggle(el, on) { el.classList.toggle('on', on); el.setAttribute('aria-checked', String(on)); }
+syncToggle(toggleOpt, state.optimize);
+syncToggle(toggleMeta, state.showMeta);
+
+settingsBtn.addEventListener('click', () => {
+  const open = settingsPanel.classList.toggle('open');
+  settingsBtn.classList.toggle('active', open);
+});
+apiKeyInput.addEventListener('input', () => {
+  state.apiKey = apiKeyInput.value;
+  localStorage.setItem(LS.KEY, state.apiKey);
+});
+function bindToggle(el, key, prop) {
+  const flip = () => {
+    state[prop] = !state[prop];
+    syncToggle(el, state[prop]);
+    localStorage.setItem(key, String(state[prop]));
+  };
+  el.addEventListener('click', flip);
+  el.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } });
+}
+bindToggle(toggleOpt, LS.OPT, 'optimize');
+bindToggle(toggleMeta, LS.META, 'showMeta');
+
+/* ── empty state ────────────────────────────────────────── */
+const EXAMPLES = [
+  'What is the capital of France?',
+  'Write a haiku about autumn.',
+  'Design a scalable distributed chat system.',
+  'Prove that √2 is irrational.',
+];
+const HOWTO = [
+  { icon: '✍️', label: 'Input' },
+  { icon: '⚡', label: 'Optimize' },
+  { icon: '⟳', label: 'Route' },
+  { icon: '◉', label: 'Model' },
+];
+
+function renderEmpty() {
+  const el = document.createElement('div');
+  el.className = 'empty';
+  el.id = 'empty-state';
+  el.innerHTML = `
+    <div class="empty-logo">${logoSVG(52)}</div>
+    <div class="empty-headline">Ask anything</div>
+    <div class="empty-sub">Your prompt is optimized and routed to the cheapest model that can handle it.</div>
+    <div class="howto">
+      ${HOWTO.map((h, i) => `
+        <div class="howto-card">
+          <div class="howto-icon">${h.icon}</div>
+          <div class="howto-label">${h.label}</div>
+        </div>
+        ${i < HOWTO.length - 1 ? '<div class="howto-arrow">→</div>' : ''}
+      `).join('')}
+    </div>
+    <div class="examples-label">Try an example</div>
+    <div class="chips">
+      ${EXAMPLES.map(e => `<button class="chip">${escapeHTML(e)}</button>`).join('')}
+    </div>
+  `;
+  thread.appendChild(el);
+  el.querySelectorAll('.chip').forEach((chip, i) => {
+    chip.addEventListener('click', () => {
+      composer.value = EXAMPLES[i];
+      autosize();
+      updateSendState();
+      composer.focus();
+    });
+  });
+}
+function removeEmpty() {
+  const el = document.getElementById('empty-state');
+  if (el) el.remove();
+}
+
+/* ── helpers ────────────────────────────────────────────── */
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function fmtCost(n) {
+  const v = Number(n);
+  if (n == null || !isFinite(v)) return '—';
+  if (v === 0) return '$0';
+  return '$' + v.toFixed(6);
+}
+
+/* ── connector SVG (animated data packet) ───────────────── */
+function connectorSVG(loop) {
+  const w = 40, h = 24;
+  const begin = loop ? '0s;mo.end+0s' : 'indefinite';
+  // we'll trigger non-loop ones via begin attribute set to a tiny offset
+  return `<svg class="connector" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+    <line x1="2" y1="${h/2}" x2="${w-2}" y2="${h/2}" stroke="var(--border-hi)" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle r="3" fill="var(--accent)">
+      <animateMotion path="M2,${h/2} L${w-2},${h/2}" dur="1.2s" ${loop ? 'repeatCount="indefinite"' : 'fill="freeze" begin="0.15s"'}/>
+    </circle>
+  </svg>`;
+}
+
+/* ── pipeline node graph ────────────────────────────────── */
+function nodeCard(icon, label, value, isEnd) {
+  return `<div class="node${isEnd ? ' end' : ''}">
+    ${isEnd ? '<span class="node-dot"></span>' : ''}
+    <div class="node-icon">${icon}</div>
+    <div class="node-label">${label}</div>
+    <div class="node-value">${escapeHTML(value)}</div>
+  </div>`;
+}
+
+function buildPipeline(meta, hasStats) {
+  const tok     = meta.tokensUsed || {};
+  const inTok   = tok.input != null ? tok.input : '—';
+  const saved   = Number(meta.tokensSaved) || 0;
+  const optVal  = saved > 0 ? `−${saved} tok` : 'no change';
+  const route   = meta.taskType || '—';
+  const model   = meta.modelUsed || '—';
+
+  const nodes = [
+    nodeCard('✍️', 'Input', `${inTok} tok`, false),
+    nodeCard('⚡', 'Optimize', optVal, false),
+    nodeCard('⟳', 'Route', route, false),
+    nodeCard('◉', 'Model', model, true),
+  ];
+  const inner = nodes[0] + connectorSVG(false) + nodes[1] + connectorSVG(false) + nodes[2] + connectorSVG(false) + nodes[3];
+  return `<div class="pipeline shimmer${hasStats ? '' : ' no-stats'}"><div class="nodes">${inner}</div></div>`;
+}
+
+function buildLoadingPipeline() {
+  const skel = (icon, label) => `<div class="node skeleton">
+    <div class="node-icon">${icon}</div>
+    <div class="node-label">${label}</div>
+    <div class="node-value">—</div>
+  </div>`;
+  const inner =
+    skel('✍️','Input') + connectorSVG(true) +
+    skel('⚡','Optimize') + connectorSVG(true) +
+    skel('⟳','Route') + connectorSVG(true) +
+    skel('◉','Model');
+  return `<div class="pipeline no-stats"><div class="nodes">${inner}</div><div class="routing-status">routing…</div></div>`;
+}
+
+/* ── stats strip ────────────────────────────────────────── */
+function buildStats(meta) {
+  const t = meta.tokensUsed || {};
+  const saved = Number(meta.tokensSaved) || 0;
+  const conf = meta.classificationConfidence != null
+    ? `${Math.round(meta.classificationConfidence * 100)}%` : '—';
+  const stats = [];
+  const stat = (k, v, good) => `<span class="stat${good ? ' good' : ''}"><span class="k">${k} · </span>${escapeHTML(v)}</span>`;
+  stats.push(stat('model', meta.modelUsed || '—'));
+  stats.push(stat('provider', meta.provider || '—'));
+  stats.push(stat('in/out', `${t.input != null ? t.input : '—'}/${t.output != null ? t.output : '—'} tok`));
+  stats.push(stat('saved', `${saved} tok`, saved > 0));
+  stats.push(stat('cost', fmtCost(meta.cost)));
+  stats.push(stat('saved', fmtCost(meta.estCostSaved), Number(meta.estCostSaved) > 0));
+  stats.push(stat('latency', `${meta.latencyMs != null ? meta.latencyMs : '—'}ms`));
+  stats.push(stat('conf', conf));
+
+  let row = '<span class="stats-check">✓</span>' + stats.join('<span class="stat-sep">|</span>');
+
+  const badges = [];
+  if (meta.rulesApplied && meta.rulesApplied.length)
+    badges.push(`<span class="badge">rules: ${escapeHTML(meta.rulesApplied.join(', '))}</span>`);
+  if (meta.fallbackUsed)
+    badges.push('<span class="badge fallback">fallback</span>');
+  if (meta.guardFlags && meta.guardFlags.length)
+    meta.guardFlags.forEach(f => badges.push(`<span class="badge guard">${escapeHTML(f)}</span>`));
+  if (badges.length) row += badges.map(b => '<span class="stat-sep">|</span>' + b).join('');
+
+  let why = '';
+  if (meta.routingReason)
+    why = `<div class="stats-why"><span class="why-k">Why: </span>${escapeHTML(meta.routingReason)}</div>`;
+
+  return `<div class="stats"><div class="stats-row">${row}</div>${why}</div>`;
+}
+
+/* ── response formatting (light markdown: paragraphs + inline code) ── */
+function formatResponse(text) {
+  return text.split(/\n{2,}/).map(p => {
+    const safe = escapeHTML(p).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\n/g, '<br>');
+    return `<p>${safe}</p>`;
+  }).join('');
+}
+
+/* ── render a user message ──────────────────────────────── */
+function addUserMessage(text) {
+  const el = document.createElement('div');
+  el.className = 'msg-user anim-in';
+  el.innerHTML = `<div class="msg-label">You</div><div class="user-bubble">${escapeHTML(text)}</div>`;
+  thread.appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+/* ── render loading bot turn ────────────────────────────── */
+function addLoadingTurn() {
+  const el = document.createElement('div');
+  el.className = 'bot-turn anim-in';
+  el.innerHTML = buildLoadingPipeline();
+  thread.appendChild(el);
+  scrollToBottom();
+  return el;
+}
+
+/* ── render completed bot turn ──────────────────────────── */
+function fillBotTurn(el, data) {
+  const meta = (data && data.metadata) || null;
+  const showMeta = state.showMeta;
+  let html = '';
+  if (showMeta && meta) {
+    html += buildPipeline(meta, true);
+    html += buildStats(meta);
+  }
+  const responseText = (data && data.response) || '';
+  html += `<div class="bot-response"><div class="msg-label">Gateway</div><div class="bot-text">${formatResponse(responseText)}</div></div>`;
+  el.innerHTML = html;
+  // retrigger shimmer
+  const pipe = el.querySelector('.pipeline');
+  if (pipe) { pipe.classList.remove('shimmer'); void pipe.offsetWidth; pipe.classList.add('shimmer'); }
+  scrollToBottom();
+}
+
+function fillErrorTurn(el, message) {
+  el.className = 'msg-error anim-in';
+  el.innerHTML = `<div class="error-bubble"><div class="error-label">Error</div><div class="error-text">${escapeHTML(message)}</div></div>`;
+  scrollToBottom();
+}
+
+function scrollToBottom() {
+  requestAnimationFrame(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }));
+}
+
+/* ════════════════════════════════════════════════════════
+   API LAYER — real endpoints with graceful simulated fallback
+   ════════════════════════════════════════════════════════ */
+
+async function healthCheck() {
+  setStatus('checking');
+  try {
+    const res = await fetch(API_BASE + '/v1/health', { method: 'GET' });
+    if (!res.ok) throw new Error('bad status');
+    const data = await res.json();
+    state.online = true;
+    setStatus('online', data.providers);
+  } catch (e) {
+    state.online = false;
+    setStatus(DEMO_FALLBACK ? 'demo' : 'offline');
+  }
+}
+
+function setStatus(mode, providers) {
+  statusPill.classList.remove('online', 'offline');
+  statusProv.textContent = '';
+  statusPill.removeAttribute('title');
+  if (mode === 'online') {
+    statusPill.classList.add('online');
+    statusText.textContent = 'online';
+    // Show the real provider values from /v1/health, e.g. "anthropic · openai".
+    if (providers && typeof providers === 'object') {
+      const keys = Object.keys(providers);
+      statusProv.textContent = keys.join(' · ');
+      statusPill.title = keys.map(k => k + ': ' + providers[k]).join('   ');
+    } else {
+      statusProv.textContent = 'anthropic · openai';
+    }
+  } else if (mode === 'demo') {
+    statusPill.classList.add('online');
+    statusText.textContent = 'demo';
+    statusProv.textContent = 'simulated';
+  } else if (mode === 'offline') {
+    statusPill.classList.add('offline');
+    statusText.textContent = 'offline';
+  } else {
+    statusText.textContent = 'checking';
+  }
+}
+
+async function callChat(prompt) {
+  // 1) Reach the gateway. A thrown TypeError here = network/CORS/unreachable.
+  let res;
+  try {
+    res = await fetch(API_BASE + '/v1/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + state.apiKey,
+      },
+      body: JSON.stringify({ prompt, preferences: { optimise: state.optimize } }),
+    });
+  } catch (netErr) {
+    const e = new Error('Network error: ' + netErr.message +
+      '  (is the gateway reachable at ' + API_BASE + '?)');
+    e.__network = true; // lets send() decide whether to fall back to the demo
+    throw e;
+  }
+
+  // 2) Parse the JSON body (your server returns JSON for both success & error).
+  let data = null;
+  try { data = await res.json(); } catch (_) { data = null; }
+
+  // 3) Surface real server errors exactly like your app:
+  //    { error: { code, message } } with a non-2xx status.
+  if (!res.ok) {
+    const err = (data && data.error) || {};
+    throw new Error('[' + (err.code || res.status) + '] ' +
+      (err.message || (data ? JSON.stringify(data) : res.statusText || 'Request failed')));
+  }
+  return data; // { response, metadata }
+}
+
+/* ── simulated routing engine ───────────────────────────── */
+function classify(prompt) {
+  const p = prompt.toLowerCase();
+  if (/√|prove|theorem|integral|derivative|equation|solve|irrational|calculus|algebra/.test(p))
+    return { taskType: 'reasoning', conf: 0.93 };
+  if (/code|function|algorithm|system|api|design a|architecture|database|distributed|scalable|implement|debug/.test(p))
+    return { taskType: 'code', conf: 0.9 };
+  if (/haiku|poem|story|write a|creative|song|imagine|describe a/.test(p))
+    return { taskType: 'creative', conf: 0.84 };
+  if (/capital|what is|who is|when|where|define|how many|fact/.test(p))
+    return { taskType: 'factual', conf: 0.96 };
+  return { taskType: 'general', conf: 0.78 };
+}
+
+const MODEL_TABLE = {
+  factual:   { model: 'claude-3-haiku',      provider: 'anthropic', inCost: 0.25e-6, outCost: 1.25e-6 },
+  creative:  { model: 'gpt-4o-mini',         provider: 'openai',    inCost: 0.15e-6, outCost: 0.60e-6 },
+  general:   { model: 'gpt-4o-mini',         provider: 'openai',    inCost: 0.15e-6, outCost: 0.60e-6 },
+  code:      { model: 'claude-3-5-sonnet',   provider: 'anthropic', inCost: 3.0e-6,  outCost: 15.0e-6 },
+  reasoning: { model: 'gpt-4o',              provider: 'openai',    inCost: 5.0e-6,  outCost: 15.0e-6 },
+};
+
+const CANNED = {
+  factual: "The capital of France is Paris. It has been the country's capital since 987 AD and is its largest city, sitting on the Seine in the north-central part of the country.",
+  creative: "Crisp leaves let go—\nthey spiral down to the earth,\nsummer's quiet end.",
+  code: "A scalable distributed chat system has a few core pieces:\n\n**Gateway / connection layer** — stateless WebSocket servers behind a load balancer. Each holds live connections; use sticky sessions or a shared presence store so any node can find a user.\n\n**Message fan-out** — publish messages to a broker (Redis Streams, Kafka, or NATS). Fan-out workers deliver to the right connection servers. This decouples senders from receivers and lets you scale horizontally.\n\n**Storage** — write the durable history to a partitioned store keyed by `conversation_id` (Cassandra or DynamoDB work well for append-heavy workloads). Cache recent messages in Redis.\n\n**Presence & delivery** — track online status and unread counts separately; use acknowledgements for at-least-once delivery and dedupe on the client with message IDs.\n\nKeep connection state thin, push everything else to brokers and stores, and you can scale each tier independently.",
+  reasoning: "Suppose, for contradiction, that √2 is rational. Then √2 = a/b for integers a, b with no common factor (lowest terms).\n\nSquaring: 2 = a²/b², so a² = 2b². Therefore a² is even, which means a is even — write a = 2k.\n\nSubstituting: (2k)² = 2b² → 4k² = 2b² → b² = 2k². So b² is even, meaning b is also even.\n\nBut now both a and b are even, contradicting our assumption that a/b was in lowest terms. Therefore √2 cannot be rational. ∎",
+  general: "Here's a concise take on that. I've routed it to a fast, low-cost model since it doesn't require heavy reasoning. Ask a follow-up if you'd like more depth and the gateway will re-evaluate which model handles it best.",
+};
+
+function estimateTokens(str) { return Math.max(1, Math.round(str.trim().split(/\s+/).length * 1.34)); }
+
+async function simulateChat(prompt) {
+  const latency = 420 + Math.round(Math.random() * 900);
+  await new Promise(r => setTimeout(r, latency));
+
+  const { taskType, conf } = classify(prompt);
+  const route = MODEL_TABLE[taskType] || MODEL_TABLE.general;
+
+  const rawInput = estimateTokens(prompt);
+  const optimize = state.optimize;
+  // optimization trims redundancy on longer prompts
+  const tokensSaved = optimize && rawInput > 6 ? Math.max(1, Math.round(rawInput * (0.12 + Math.random() * 0.22))) : 0;
+  const inputTok = rawInput - tokensSaved;
+
+  const response = CANNED[taskType] || CANNED.general;
+  const outputTok = estimateTokens(response);
+
+  const cost = inputTok * route.inCost + outputTok * route.outCost;
+  const estCostSaved = tokensSaved * route.inCost;
+
+  const rules = [];
+  if (taskType === 'factual') rules.push('prefer-cheap');
+  if (taskType === 'code' || taskType === 'reasoning') rules.push('capability-floor');
+  if (optimize && tokensSaved > 0) rules.push('dedupe');
+
+  const reasons = {
+    factual: `Classified as a factual lookup with ${Math.round(conf*100)}% confidence — routed to the cheapest model that clears the accuracy bar.`,
+    creative: 'Short-form creative task; a small, fast model produces good output at minimal cost.',
+    code: 'Task needs strong reasoning and long-context handling, so it was routed above the cheap tier to a capable coding model.',
+    reasoning: 'Multi-step proof requires reliable chain-of-thought; routed to a high-capability reasoning model despite higher cost.',
+    general: 'No strong signal for a specialized model — defaulted to a fast, low-cost general model.',
+  };
+
+  return {
+    response,
+    __simulated: true,
+    metadata: {
+      modelUsed: route.model,
+      provider: route.provider,
+      taskType,
+      classificationConfidence: conf,
+      tokensUsed: { input: inputTok, output: outputTok },
+      tokensSaved,
+      cost,
+      estCostSaved,
+      latencyMs: latency,
+      routingReason: reasons[taskType] || reasons.general,
+      rulesApplied: rules,
+      fallbackUsed: false,
+      guardFlags: [],
+    },
+  };
+}
+
+/* ════════════════════════════════════════════════════════
+   SEND FLOW
+   ════════════════════════════════════════════════════════ */
+async function send() {
+  const text = composer.value.trim();
+  if (!text || state.busy) return;
+
+  state.busy = true;
+  updateSendState();
+  removeEmpty();
+
+  addUserMessage(text);
+  composer.value = '';
+  autosize();
+
+  const turn = addLoadingTurn();
+
+  try {
+    let data;
+    try {
+      data = await callChat(text);
+    } catch (err) {
+      // Only fall back to the local simulation when the gateway is unreachable
+      // AND demo mode is on. Real HTTP/server errors are always shown.
+      if (DEMO_FALLBACK && err.__network) {
+        data = await simulateChat(text);
+      } else {
+        throw err;
+      }
+    }
+    fillBotTurn(turn, data);
+  } catch (e) {
+    fillErrorTurn(turn, e.message || 'Request failed. Check your gateway connection and API key.');
+  } finally {
+    state.busy = false;
+    updateSendState();
+  }
+}
+
+/* ── composer behavior ──────────────────────────────────── */
+function autosize() {
+  composer.style.height = 'auto';
+  composer.style.height = Math.min(composer.scrollHeight, 160) + 'px';
+}
+function updateSendState() {
+  sendBtn.disabled = state.busy || composer.value.trim().length === 0;
+}
+composer.addEventListener('input', () => { autosize(); updateSendState(); });
+composer.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    if (e.shiftKey) return; // newline
+    // Enter or Cmd/Ctrl+Enter sends
+    e.preventDefault();
+    send();
+  }
+});
+sendBtn.addEventListener('click', send);
+
+/* ── init ───────────────────────────────────────────────── */
+renderEmpty();
+autosize();
+updateSendState();
+healthCheck();
+</script>
+</body>
+</html>
